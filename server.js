@@ -17,7 +17,20 @@ let db = new sqlite3.Database('credentials.db', (err) => {
         console.log(err.message);
     }
     console.log('Connected to the access database.')
-})
+});
+
+app.post('/checkUsername', (req, res) => {
+    const { username } = req.body;
+
+    db.get('SELECT * FROM credentials WHERE username = ?', [username], (err, row) => {
+        if (err) {
+            res.status(500).send('Internal Server Error');
+        } else {
+            const isUsernameAvailable = !row;
+            res.send({ available: isUsernameAvailable });
+        }
+    });
+});
 
 app.post('/validatePassword', (req, res) => {
     const { username, password } = req.body;
@@ -41,8 +54,16 @@ app.post('/validatePassword', (req, res) => {
     });
 });
 
-app.post('/register', (req, res) => {
+app.post('/register', async (req, res) => {
     const { name, username, password } = req.body;
+
+    // Check if the username is already taken
+    const isUsernameAvailable = await checkUsernameAvailability(username);
+
+    if (!isUsernameAvailable) {
+        // Username is not available
+        return res.send({ success: false, message: 'Username is already taken' });
+    }
 
     // Hash the password before storing it in the database
     const hashedPassword = bcrypt.hashSync(password, 10);
@@ -52,13 +73,27 @@ app.post('/register', (req, res) => {
         if (err) {
             console.error(err.message);
             res.status(500).send('Internal Server Error');
-        } else {
-            res.send({ success: true, message: 'User registered successfully' });
-        }
+        } 
+        //Registration success
+        console.log('User registered successfully');
+        res.send({ success: true, message: 'User registered succesfully' });
     });
 });
 
-app.post ('/login', (req, res) => {
+async function checkUsernameAvailability(username) {
+    return new Promise((resolve) => {
+        db.get('SELECT * FROM credentials WHERE username = ?', [username], (err, row) => {
+            if (err) {
+                console.error(err.message);
+                resolve(false);
+            } else {
+                resolve(!row);
+            }
+        });
+    });
+}
+
+app.post('/login', (req, res) => {
     const { username, password } = req.body;
 
     db.get('SELECT * FROM credentials WHERE username = ?', [username], (err, row) => {
@@ -70,7 +105,7 @@ app.post ('/login', (req, res) => {
             const isPasswordValid = bcrypt.compareSync(password, storedHashedPassword);
 
             if (isPasswordValid) {
-                res.send({ validation: true});
+                res.send({ validation: true });
             } else {
                 res.send({ validation: false });
             }
