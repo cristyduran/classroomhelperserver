@@ -3,7 +3,7 @@ const app = express()
 const cors = require('cors')
 const sqlite3 = require('sqlite3');
 const bcrypt = require('bcrypt');
-
+const jwt = require('jsonwebtoken');
 
 app.use(cors())
 app.use((req, res, next) => {
@@ -69,11 +69,11 @@ app.post('/register', async (req, res) => {
     const hashedPassword = bcrypt.hashSync(password, 10);
 
     // Insert the user into the database (you need to modify this query based on your table structure)
-    db.run('INSERT INTO credentials (name, username, password) VALUES (?, ?, ?)', [name, username, hashedPassword], (err) => {
+    db.run('INSERT INTO credentials (name, username, password, hashedpassword) VALUES (?, ?, ?, ?)', [name, username, password, hashedPassword], (err) => {
         if (err) {
             console.error(err.message);
             res.status(500).send('Internal Server Error');
-        } 
+        }
         //Registration success
         console.log('User registered successfully');
         res.send({ success: true, message: 'User registered succesfully' });
@@ -98,21 +98,45 @@ app.post('/login', (req, res) => {
 
     db.get('SELECT * FROM credentials WHERE username = ?', [username], (err, row) => {
         if (err) {
-            res.status(500).send('Internal Server Error');
+            console.error('Error retrieving user:', err);
+            return res.status(500).send('Internal Server Error');
         }
         if (row) {
-            const storedHashedPassword = row.password;
+            const storedHashedPassword = row.hashedpassword;
+
+            // Log relevant information
+            console.log('Stored Hashed Password:', storedHashedPassword);
+            console.log('Password Provided by User:', password);
+
             const isPasswordValid = bcrypt.compareSync(password, storedHashedPassword);
 
             if (isPasswordValid) {
-                res.send({ validation: true });
+                //assuming you have some kind of user ID
+                const userId = row.username;
+
+                //generate a token
+                const token = generateAuthToken(userId);
+
+                //send the token in the response
+                res.send({ validation: true, authToken: token });
             } else {
-                res.send({ validation: false });
+                return res.send({ validation: false });
             }
         } else {
             res.send({ validation: false });
         }
     });
 });
+
+
+function generateAuthToken(userId) {
+    console.log('Generating token for user ID:', userId);
+    //Your token generation logic here
+    //examples using jsonwebtoken library
+    const token = jwt.sign({ userId }, 'yourSecretKey', { expiresIn: '1h' });
+
+    console.log('Generated token:', token);
+    return token;
+}
 
 app.listen(3001, () => console.log('Listening at port 3001'));
