@@ -1,9 +1,59 @@
-const express = require('express')
-const app = express()
-const cors = require('cors')
-const sqlite3 = require('sqlite3');
+//server.js
+const express = require('express');
+const session = require('express-session');
+const app = express();
+const cors = require('cors');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+const classRoutes = require('./routes/classRoutes'); 
+const generateAuthToken = require('./controllers/authenticationController'); // Adjust the path accordingly
+
+const authenticateToken = require('./middleware/authenticationMiddleware');
+
+const db = require('./db/db');
+
+async function findUserByUsername(username) {
+    return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM credentials WHERE username = ?', [username], (err, row) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(row);
+            }
+        });
+    });
+}
+// Passport Configuration
+passport.use(new LocalStrategy(
+    // ... (your LocalStrategy configuration)
+    async (username, password, done) => {
+
+        // Find user by username in the database
+        const user = await findUserByUsername(username);
+
+        if (!user) {
+            return done(null, false, { message: 'Invalid username' });
+        }
+
+        // Check if the provided password matches the stored hashed password
+        const isPasswordValid = bcrypt.compareSync(password, user.hashedpassword);
+
+        if (!isPasswordValid) {
+            return done(null, false, { message: 'Invalid password' });
+        }
+
+        // Authentication successful, pass the user object to the next middleware or route handler
+        return done(null, user);
+    }
+));
+
+passport.serializeUser((user, done) => done(null, user.username));
+passport.deserializeUser(async (username, done) => {
+    // Retrieve user from the database using the provided username
+    const user = await findUserByUsername(username);
+    done(null, user);
+});
 
 app.use(cors())
 app.use((req, res, next) => {
@@ -11,13 +61,9 @@ app.use((req, res, next) => {
     next();
 })
 app.use(express.json({ limit: '10mb' }))
-
-let db = new sqlite3.Database('credentials.db', (err) => {
-    if (err) {
-        console.log(err.message);
-    }
-    console.log('Connected to the access database.')
-});
+app.use(session({ secret: 'yourSecretKey', resave: false, saveUninitialized: false }));
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.post('/checkUsername', (req, res) => {
     const { username } = req.body;
@@ -54,6 +100,19 @@ app.post('/validatePassword', (req, res) => {
     });
 });
 
+async function checkUsernameAvailability(username) {
+    return new Promise((resolve) => {
+        db.get('SELECT * FROM credentials WHERE username = ?', [username], (err, row) => {
+            if (err) {
+                console.error(err.message);
+                resolve(false);
+            } else {
+                resolve(!row);
+            }
+        });
+    });
+} 
+
 app.post('/register', async (req, res) => {
     const { name, username, password } = req.body;
 
@@ -80,63 +139,27 @@ app.post('/register', async (req, res) => {
     });
 });
 
-async function checkUsernameAvailability(username) {
-    return new Promise((resolve) => {
-        db.get('SELECT * FROM credentials WHERE username = ?', [username], (err, row) => {
-            if (err) {
-                console.error(err.message);
-                resolve(false);
-            } else {
-                resolve(!row);
-            }
-        });
-    });
-}
-
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-
-    db.get('SELECT * FROM credentials WHERE username = ?', [username], (err, row) => {
-        if (err) {
-            console.error('Error retrieving user:', err);
-            return res.status(500).send('Internal Server Error');
-        }
-        if (row) {
-            const storedHashedPassword = row.hashedpassword;
-
-            // Log relevant information
-            console.log('Stored Hashed Password:', storedHashedPassword);
-            console.log('Password Provided by User:', password);
-
-            const isPasswordValid = bcrypt.compareSync(password, storedHashedPassword);
-
-            if (isPasswordValid) {
-                //assuming you have some kind of user ID
-                const userId = row.username;
-
-                //generate a token
-                const token = generateAuthToken(userId);
-
-                //send the token in the response
-                res.send({ validation: true, authToken: token });
-            } else {
-                return res.send({ validation: false });
-            }
-        } else {
-            res.send({ validation: false });
-        }
-    });
-});
 
 
-function generateAuthToken(userId) {
-    console.log('Generating token for user ID:', userId);
-    //Your token generation logic here
-    //examples using jsonwebtoken library
-    const token = jwt.sign({ userId }, 'yourSecretKey', { expiresIn: '1h' });
+app.post('/login', passport.authenticate('local'), (req, res) => {
+    // Authentication successful
+    const userId = req.user.username;
+    const token = generateAuthToken(userId);
+    res.send({ validation: true, authToken: token });
+  });
 
-    console.log('Generated token:', token);
-    return token;
-}
+
+
+// Apply the authentication middleware to specific routes or globally
+app.use('/authenticatedRoute', authenticateToken);
+
+// Use class-related routes
+app.use('/classes', authenticateToken, classRoutes);
+
+module.exports = {
+    app,
+    db,
+};
+console.log(module)
 
 app.listen(3001, () => console.log('Listening at port 3001'));
