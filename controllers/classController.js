@@ -29,9 +29,11 @@ async function createClass(req, res) {
             const classId = result.lastID;
             console.log('Class ID:', classId);
 
+            // Filter the students array to remove empty strings
+            const studentsWithNames = students.filter(studentName => studentName.trim() !== '');
             // Insert students into the 'students' table
             console.log('Inserting students into the students table...');
-            for (const studentName of students) {
+            for (const studentName of studentsWithNames) {
                 await db.run('INSERT INTO students (student_name, class_id) VALUES (?, ?)', [studentName, classId]);
             }
 
