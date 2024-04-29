@@ -53,6 +53,25 @@ async function createClass(req, res) {
     }
 }
 
-module.exports = createClass;
+async function getClassData(req, res) {
+    //Fetch class data from the database based on the user Id
+    const userId = req.user.userId;
+    console.log('Received request to fetch class data for user ID:', userId); // Add logging here
+
+    const sql = 'SELECT * FROM classes WHERE user_id = ?';
+
+    console.log('Fetching class data for user ID:', userId);
+
+    db.all(sql, [userId], (err, rows) => {
+        if (err) {
+            console.error('Error fetching class data:', err);
+            return res.status(500).json({ error: 'Internal Server Error' });
+        }
+        console.log('Fetched class data:', rows);
+        res.json(rows); //Send the fetched class data as JSON response
+    });
+}
+
+module.exports = { createClass, getClassData };
 
 

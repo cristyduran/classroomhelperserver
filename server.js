@@ -6,10 +6,10 @@ const cors = require('cors');
 const bcrypt = require('bcrypt');
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
+const authenticateToken = require('./middleware/authenticationMiddleware');
 const classRoutes = require('./routes/classRoutes'); 
 const generateAuthToken = require('./controllers/authenticationController'); // Adjust the path accordingly
 
-const authenticateToken = require('./middleware/authenticationMiddleware');
 
 const db = require('./db/db');
 
