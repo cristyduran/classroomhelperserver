@@ -58,7 +58,7 @@ async function getClassData(req, res) {
     const userId = req.user.userId;
     console.log('Received request to fetch class data for user ID:', userId); // Add logging here
 
-    const sql = 'SELECT * FROM classes WHERE user_id = ?';
+    const sql = 'SELECT class_name, grade_level FROM classes JOIN credentials ON classes.user_id = credentials.user_id WHERE credentials.username = ?;'
 
     console.log('Fetching class data for user ID:', userId);
 
