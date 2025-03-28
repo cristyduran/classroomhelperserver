@@ -72,6 +72,21 @@ async function getClassData(req, res) {
     });
 }
 
-module.exports = { createClass, getClassData };
+async function getSingleClassData(req, res) {
+    const { classId } = req.params; //capture classId from route parameters
+    const sql = 'SELECT class_name, grade_level FROM classes WHERE class_id =?';
+    db.get(sql, [classId], (err, row) => {
+        if (err) {
+            console.error('Error fetching single class data:', err);
+            return res.status(500).json({ error: 'Internal Server Error'});
+        }
+        if (!row) {
+            return res.status(404).json({ error: 'Class not found' });
+        }
+        res.json(row);
+    });
+}
+
+module.exports = { createClass, getClassData, getSingleClassData };
 
 
