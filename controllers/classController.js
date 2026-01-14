@@ -58,7 +58,8 @@ async function getClassData(req, res) {
     const userId = req.user.userId;
     console.log('Received request to fetch class data for user ID:', userId); // Add logging here
 
-    const sql = 'SELECT class_name, grade_level FROM classes JOIN credentials ON classes.user_id = credentials.user_id WHERE credentials.username = ?;'
+    //const sql = 'SELECT class_id, class_name, grade_level FROM classes WHERE user_id = ?';
+    const sql = 'SELECT class_id, class_name, grade_level FROM classes JOIN credentials ON classes.user_id = credentials.user_id WHERE credentials.username = ?;'
 
     console.log('Fetching class data for user ID:', userId);
 
@@ -74,11 +75,13 @@ async function getClassData(req, res) {
 
 async function getSingleClassData(req, res) {
     const { classId } = req.params; //capture classId from route parameters
-    const sql = 'SELECT class_name, grade_level FROM classes WHERE class_id =?';
+    console.log('Fetching data for class ID:', classId); // Debugging
+
+    const sql = 'SELECT class_id, class_name, grade_level FROM classes WHERE class_id =?';
     db.get(sql, [classId], (err, row) => {
         if (err) {
             console.error('Error fetching single class data:', err);
-            return res.status(500).json({ error: 'Internal Server Error'});
+            return res.status(500).json({ error: 'Internal Server Error' });
         }
         if (!row) {
             return res.status(404).json({ error: 'Class not found' });
@@ -87,6 +90,47 @@ async function getSingleClassData(req, res) {
     });
 }
 
-module.exports = { createClass, getClassData, getSingleClassData };
+async function getClassRosterAndAssignments(req, res) {
+    const { classId } = req.params;
+
+    const studentsQuery = 'SELECT student_id, student_name FROM students WHERE class_id =?';
+    const assignmentsQuery = 'SELECT assignment_id, assignment_name, assignment_icon FROM assignments WHERE class_id = ?';
+
+    try {
+        const students = await new Promise((resolve, reject) => {
+            db.all(studentsQuery, [classId], (err, rows) => err ? reject(err) : resolve(rows));
+        });
+
+        const assignments = await new Promise((resolve, reject) => {
+            db.all(assignmentsQuery, [classId], (err, rows) => err ? reject(err) : resolve(rows));
+        });
+
+        const completions = await new Promise ((resolve, reject) =>{
+            db.all(
+                `SELECT student_id, assignment_id, completed
+                FROM student_assignments
+                WHERE class_id =?`,
+                [classId],
+            (err, rows) => (err ? reject(err) : resolve(rows))
+            );
+        });
+        console.log('Fetched students:', students);
+        console.log('Fetched assignments:', assignments);
+
+        res.json({ students, assignments, completions });
+
+    } catch (error) {
+        console.error('Error fetching class data:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}
+
+//new function to save student assignment completion
+async function saveCompletion(req, res) {
+
+}
+
+module.exports = { createClass, getClassData, getSingleClassData, getClassRosterAndAssignments };
+
 
 
