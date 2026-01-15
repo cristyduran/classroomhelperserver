@@ -93,8 +93,13 @@ async function getSingleClassData(req, res) {
 async function getClassRosterAndAssignments(req, res) {
     const { classId } = req.params;
 
+    console.log('Running student-data query for classId:', classId);
+
     const studentsQuery = 'SELECT student_id, student_name FROM students WHERE class_id =?';
     const assignmentsQuery = 'SELECT assignment_id, assignment_name, assignment_icon FROM assignments WHERE class_id = ?';
+    const completionsQuery = 'SELECT student_id, assignment_id, completed FROM student_assignments WHERE class_id =?';
+
+    console.log(studentsQuery);
 
     try {
         const students = await new Promise((resolve, reject) => {
@@ -106,16 +111,12 @@ async function getClassRosterAndAssignments(req, res) {
         });
 
         const completions = await new Promise ((resolve, reject) =>{
-            db.all(
-                `SELECT student_id, assignment_id, completed
-                FROM student_assignments
-                WHERE class_id =?`,
-                [classId],
-            (err, rows) => (err ? reject(err) : resolve(rows))
-            );
+            db.all(completionsQuery, [classId], (err, rows) => (err ? reject(err) : resolve(rows)));
         });
+
         console.log('Fetched students:', students);
         console.log('Fetched assignments:', assignments);
+        console.log('Fetched completions:', completions);
 
         res.json({ students, assignments, completions });
 
@@ -127,10 +128,25 @@ async function getClassRosterAndAssignments(req, res) {
 
 //new function to save student assignment completion
 async function saveCompletion(req, res) {
+    const { classId } = req.params;
+    const { student_id, assignment_id, completed } = req.body;
 
+    const sql = 
+        `INSERT INTO student_assignments (student_id, class_id, assignment_id, completed)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(student_id, assignment_id, class_id)
+        DO UPDATE SET completed = excluded.completed`;
+
+    db.run (sql, [student_id, classId, assignment_id, completed ? 1: 0], err => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ error: 'Failed to update assignment'});
+        }
+        res.json({ success:true });
+    })
 }
 
-module.exports = { createClass, getClassData, getSingleClassData, getClassRosterAndAssignments };
+module.exports = { createClass, getClassData, getSingleClassData, getClassRosterAndAssignments, saveCompletion };
 
 
 
