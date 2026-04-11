@@ -14,7 +14,7 @@ function authenticateToken(req, res, next) {
     
         try {
             // Verify and decode the token
-            const decoded = jwt.verify(token, 'yourSecretKey');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
             // Attach the decoded information to the request object
             req.user = decoded;
@@ -30,4 +30,4 @@ function authenticateToken(req, res, next) {
         }
 };
 
-module.exports = authenticateToken;
+module.exports = authenticat
