@@ -30,4 +30,4 @@ function authenticateToken(req, res, next) {
         }
 };
 
-module.exports = authenticat
+module.exports = authenticateToken;
