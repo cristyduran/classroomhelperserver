@@ -11,4 +11,4 @@ function generateAuthToken(userId) {
     return token;
 }
 
-module.exports = generateAut
+module.exports = generateAuthToken;
