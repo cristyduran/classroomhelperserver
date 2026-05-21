@@ -135,7 +135,50 @@ async function saveCompletion(req, res) {
     }
 }
 
-module.exports = { createClass, getClassData, getSingleClassData, getClassRosterAndAssignments, saveCompletion };
+async function updateClass(req, res) {
+    const { classId } = req.params;
+    const { className, gradeLevel, students, assignments } = req.body;
+
+    try {
+        await db.execute({
+            sql: `UPDATE classes SET class_name = ?, grade_level = ? WHERE class_id = ?`,
+            args: [className, gradeLevel, classId]
+
+        });
+
+        await db.execute({
+            sql: `DELETE FROM students WHERE class_id = ? `,
+            args: [classId]
+        })
+
+        for (const student of students) {
+            await db.execute({
+                sql: 'INSERT INTO students (student_name, class_id) VALUES (?, ?)',
+                args: [student, classId]
+            })
+        }
+
+        await db.execute({
+            sql: `DELETE FROM assignments WHERE class_id = ? `,
+            args: [classId]
+        })
+
+        for (const assignment of assignments) {
+            await db.execute({
+                sql: 'INSERT INTO assignments (assignment_name, assignment_icon, class_id) VALUES (?, ?, ?)',
+                args: [assignment.assignment, assignment.icon, classId]
+            })
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to update assignment' });
+    }
+
+
+}
+
+module.exports = { createClass, getClassData, getSingleClassData, getClassRosterAndAssignments, saveCompletion, updateClass };
 
 
 
